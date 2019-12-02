@@ -47,24 +47,34 @@ if __name__ == "__main__":
     # loop over the number of segments
     # apply SLIC and extract (approximately) the supplied number
     # of segments
-    segments = slic(image, n_segments = 25, sigma = 5)
+    segments = slic(image, n_segments = 200)
 
     # show the output of SLIC
     fig = plt.figure("Superpixels -- %d segments" % (25))
     ax = fig.add_subplot(1, 1, 1)
     ax.imshow(mark_boundaries(image, segments))
     plt.axis("off")
-        
-    for (i, segVal) in enumerate(np.unique(segments)):
-        # construct a mask for the segment
-        print ("[x] inspecting segment %d" % (i))
-        mask = np.zeros(image.shape[:2], dtype = "uint8")
-        mask[segments == segVal] = 255
-    
-        # show the masked region
-        cv2.imshow("Mask", mask)
-        cv2.imshow("Applied", cv2.bitwise_and(originalImage, originalImage, mask = mask))
-        cv2.waitKey(0)
-
     # show the plots
     plt.show()
+    fig.savefig('test.png')    
+    
+    #
+    img = cv2.imread('test.png',0)
+    cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
+    kernel = np.ones((5,5),np.uint8)
+    dilation = cv2.dilate(img,kernel,iterations = 1)
+    circles = cv2.HoughCircles(dilation,cv2.HOUGH_GRADIENT,1,10,
+                                param1=50,param2=12,minRadius=0,maxRadius=20)
+
+    circles = np.uint16(np.around(circles))
+    for i in circles[0,:]:
+        # draw the outer circle
+        cv2.circle(cimg,(i[0],i[1]),i[2],(0,255,0),2)
+        # draw the center of the circle
+        cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
+
+    cv2.imshow('detected circles',cimg)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+ 
+   
