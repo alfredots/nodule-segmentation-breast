@@ -27,10 +27,9 @@ if __name__ == "__main__":
     args = vars(ap.parse_args())
 
     # load the image and convert it to a floating point data type
-    preImage = cv2.imread(args["image"])
+    originalImage = cv2.imread(args["image"])
     #aplicar o negativo
-    preImage = cv2.bitwise_not(preImage)
-    cv2.imshow('negaaaa', preImage)
+    preImage = cv2.bitwise_not(originalImage)
     #aplicando contraste
     alpha = 2.2 # Simple contrast control
     beta = 50   # Simple brightness control
@@ -40,23 +39,32 @@ if __name__ == "__main__":
             for c in range(preImage.shape[2]):
                 new_image[y,x,c] = np.clip(alpha*preImage[y,x,c] + beta, 0, 255)
 
-    cv2.imshow('aaaaaa', new_image)
     #aplicando thresholding
     a,preImage = cv2.threshold(new_image,150, 255, cv2.THRESH_BINARY)
 
     image = img_as_float(preImage)
 
     # loop over the number of segments
-    for numSegments in (100, 200, 300):
-        # apply SLIC and extract (approximately) the supplied number
-        # of segments
-        segments = slic(image, n_segments = numSegments, sigma = 5)
+    # apply SLIC and extract (approximately) the supplied number
+    # of segments
+    segments = slic(image, n_segments = 25, sigma = 5)
 
-        # show the output of SLIC
-        fig = plt.figure("Superpixels -- %d segments" % (numSegments))
-        ax = fig.add_subplot(1, 1, 1)
-        ax.imshow(mark_boundaries(image, segments))
-        plt.axis("off")
+    # show the output of SLIC
+    fig = plt.figure("Superpixels -- %d segments" % (25))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.imshow(mark_boundaries(image, segments))
+    plt.axis("off")
+        
+    for (i, segVal) in enumerate(np.unique(segments)):
+        # construct a mask for the segment
+        print ("[x] inspecting segment %d" % (i))
+        mask = np.zeros(image.shape[:2], dtype = "uint8")
+        mask[segments == segVal] = 255
+    
+        # show the masked region
+        cv2.imshow("Mask", mask)
+        cv2.imshow("Applied", cv2.bitwise_and(originalImage, originalImage, mask = mask))
+        cv2.waitKey(0)
 
     # show the plots
     plt.show()
