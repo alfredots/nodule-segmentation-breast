@@ -3,6 +3,7 @@ from skimage.segmentation import slic
 from skimage.segmentation import mark_boundaries
 from skimage.util import img_as_float
 from skimage import io
+from skimage import color
 import matplotlib.pyplot as plt
 import argparse
 import cv2
@@ -47,8 +48,8 @@ if __name__ == "__main__":
     # loop over the number of segments
     # apply SLIC and extract (approximately) the supplied number
     # of segments
-    segments = slic(image, n_segments = 200)
-
+    segments = slic(image,  n_segments=100)
+    print("Slic number of segments: %d" % len(np.unique(segments)))
     # show the output of SLIC
     fig = plt.figure("Superpixels -- %d segments" % (25))
     ax = fig.add_subplot(1, 1, 1)
@@ -56,25 +57,52 @@ if __name__ == "__main__":
     plt.axis("off")
     # show the plots
     plt.show()
-    fig.savefig('test.png')    
     
     #
-    img = cv2.imread('test.png',0)
-    cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
-    kernel = np.ones((5,5),np.uint8)
-    dilation = cv2.dilate(img,kernel,iterations = 1)
-    circles = cv2.HoughCircles(dilation,cv2.HOUGH_GRADIENT,1,10,
-                                param1=50,param2=12,minRadius=0,maxRadius=20)
+    # loop over the unique segment values
+    for (i, segVal) in enumerate(np.unique(segments)):
+        # construct a mask for the segment
+        mask = np.zeros(image.shape[:2], dtype = "uint8")
+        mask[segments == segVal] = 255
+        superImage = cv2.bitwise_and(preImage, preImage, mask = mask)
+        color = ('b','g','r')
+        for i,col in enumerate(color):
+            histr = cv2.calcHist([superImage],[i], mask,[256],[0,256])
+            plt.plot(histr,color = col)
+            media = (histr[0] + histr[255]) / 2
+            plt.xlim([0,256])
+        print("media %d" % media)
+        if media > 5000:
+            #plt.show()
+            # show the masked region
+            #cv2.imshow("Applied", superImage)
+            #cv2.waitKey(0)
+            # show the plots
+            new_image = originalImage.copy()
+            cv2.waitKey(0)
+            for y in range(originalImage.shape[0]):
+                for x in range(originalImage.shape[1]):
+                    for c in range(originalImage.shape[2]):
+                        if superImage[y,x,c] == 255:
+                            new_image[y,x,c] = 255
+            cv2.imshow("result", new_image)
+            cv2.waitKey(0)
+    # img = cv2.imread('test.png',0)
+    # cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
+    # kernel = np.ones((5,5),np.uint8)
+    # dilation = cv2.dilate(img,kernel,iterations = 1)
+    # circles = cv2.HoughCircles(dilation,cv2.HOUGH_GRADIENT,1,10,
+    #                             param1=50,param2=12,minRadius=0,maxRadius=20)
 
-    circles = np.uint16(np.around(circles))
-    for i in circles[0,:]:
-        # draw the outer circle
-        cv2.circle(cimg,(i[0],i[1]),i[2],(0,255,0),2)
-        # draw the center of the circle
-        cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
+    # circles = np.uint16(np.around(circles))
+    # for i in circles[0,:]:
+    #     # draw the outer circle
+    #     cv2.circle(cimg,(i[0],i[1]),i[2],(0,255,0),2)
+    #     # draw the center of the circle
+    #     cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
 
-    cv2.imshow('detected circles',cimg)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('detected circles',cimg)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
  
    
