@@ -1,6 +1,8 @@
 # import the necessary packages
 from skimage.segmentation import slic
+from skimage.measure import regionprops
 from skimage.segmentation import mark_boundaries
+from skimage.future import graph
 from skimage.util import img_as_float
 from skimage import io
 from skimage import color
@@ -9,17 +11,8 @@ import argparse
 import cv2
 import numpy as np
 
-def aumentarContraste(img):
-        newImage = np.zeros((img.shape[0],img.shape[1]), np.uint8)
-        rows, columns= img.shape
-
-        for i in range(rows):
-            for j in range(columns):
-                resultado = 15.9687*np.sqrt(img[i,j])
-                if resultado > 255:
-                    resultado = 255
-                newImage[i,j] = resultado
-        return newImage
+def rgb2gray(rgb):
+    return np.dot(rgb[..., :3], [0.2126, 0.7152, 0.0722])
         
 if __name__ == "__main__":
     # construct the argument parser and parse the arguments
@@ -29,80 +22,51 @@ if __name__ == "__main__":
 
     # load the image and convert it to a floating point data type
     originalImage = cv2.imread(args["image"])
-    #aplicar o negativo
-    preImage = cv2.bitwise_not(originalImage)
-    #aplicando contraste
-    alpha = 2.2 # Simple contrast control
-    beta = 50   # Simple brightness control
-    new_image = np.zeros(preImage.shape, preImage.dtype)
-    for y in range(preImage.shape[0]):
-        for x in range(preImage.shape[1]):
-            for c in range(preImage.shape[2]):
-                new_image[y,x,c] = np.clip(alpha*preImage[y,x,c] + beta, 0, 255)
-
-    #aplicando thresholding
-    a,preImage = cv2.threshold(new_image,150, 255, cv2.THRESH_BINARY)
-
-    image = img_as_float(preImage)
-
-    # loop over the number of segments
-    # apply SLIC and extract (approximately) the supplied number
-    # of segments
-    segments = slic(image,  n_segments=100)
+    
+    image = img_as_float(originalImage)
+    #
+    segments = 1 + slic(originalImage,  n_segments=100)
     print("Slic number of segments: %d" % len(np.unique(segments)))
     # show the output of SLIC
     fig = plt.figure("Superpixels -- %d segments" % (25))
     ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(mark_boundaries(image, segments))
+    #
+
+    regions = regionprops(segments, intensity_image=rgb2gray(image))
+    intensities = []
+    for props in regions:
+        intensities.append(props.mean_intensity)
+
+    sortList = sorted(intensities, key=float, reverse=True)
+
+    media = (sortList[0] + sortList[1] + sortList[2]) / 3
+    minrList = []
+    mincList = []
+    maxrList = []
+    maxcList = []
+    for props in regions:
+        if props.mean_intensity >= media:
+            cy, cx = props.centroid
+            minr, minc, maxr, maxc = props.bbox
+            minrList.append(minr)
+            mincList.append(minc)
+            maxrList.append(maxr)
+            maxcList.append(maxc)
+    #
+    minrList = sorted(minrList, key=float)
+    mincList = sorted(mincList, key=float)
+    maxrList = sorted(maxrList, key=float, reverse=True)
+    maxcList = sorted(maxcList, key=float, reverse=True)
+    #
+    rect = plt.Rectangle((mincList[0], minrList[0]), maxcList[0] - mincList[0], maxrList[0] - minrList[0], fill=False, edgecolor='red', linewidth=2)
+    ax.add_patch(rect)
+    #
+    ax.imshow(mark_boundaries(originalImage, segments))
     plt.axis("off")
     # show the plots
     plt.show()
-    
     #
     # loop over the unique segment values
-    for (i, segVal) in enumerate(np.unique(segments)):
-        # construct a mask for the segment
-        mask = np.zeros(image.shape[:2], dtype = "uint8")
-        mask[segments == segVal] = 255
-        superImage = cv2.bitwise_and(preImage, preImage, mask = mask)
-        color = ('b','g','r')
-        for i,col in enumerate(color):
-            histr = cv2.calcHist([superImage],[i], mask,[256],[0,256])
-            plt.plot(histr,color = col)
-            media = (histr[0] + histr[255]) / 2
-            plt.xlim([0,256])
-        print("media %d" % media)
-        if media > 5000:
-            #plt.show()
-            # show the masked region
-            #cv2.imshow("Applied", superImage)
-            #cv2.waitKey(0)
-            # show the plots
-            new_image = originalImage.copy()
-            cv2.waitKey(0)
-            for y in range(originalImage.shape[0]):
-                for x in range(originalImage.shape[1]):
-                    for c in range(originalImage.shape[2]):
-                        if superImage[y,x,c] == 255:
-                            new_image[y,x,c] = 255
-            cv2.imshow("result", new_image)
-            cv2.waitKey(0)
-    # img = cv2.imread('test.png',0)
-    # cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
-    # kernel = np.ones((5,5),np.uint8)
-    # dilation = cv2.dilate(img,kernel,iterations = 1)
-    # circles = cv2.HoughCircles(dilation,cv2.HOUGH_GRADIENT,1,10,
-    #                             param1=50,param2=12,minRadius=0,maxRadius=20)
 
-    # circles = np.uint16(np.around(circles))
-    # for i in circles[0,:]:
-    #     # draw the outer circle
-    #     cv2.circle(cimg,(i[0],i[1]),i[2],(0,255,0),2)
-    #     # draw the center of the circle
-    #     cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
-
-    # cv2.imshow('detected circles',cimg)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
- 
+    
    
